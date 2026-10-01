@@ -354,9 +354,8 @@ impl World {
             }
         }
 
-        // Puck friction + integrate.
-        let damp = (-self.friction * dt).exp();
-        self.puck.vel = self.puck.vel * damp;
+        // Puck friction + integrate (PhysX 4.1 linear damping, not exponential).
+        self.puck.vel = self.puck.vel * crate::physx::damping_factor(self.friction, dt);
         // Clamp puck speed (slapshot cap ~30 m/s).
         let ps = self.puck.vel.length();
         if ps > 30.0 {
@@ -457,13 +456,14 @@ mod tests {
 
     #[test]
     fn puck_friction_decays_velocity() {
+        // PhysX 4.1 linear damping: v *= max(0, 1-d*dt). v=10, d=1, dt=1 -> 0.
         let mut w = World::new(1.0, 0.85);
         w.puck.vel = Vec2::new(10.0, 0.0);
         let mut players: Vec<Player> = vec![];
         let inputs: Vec<PlayerInput> = vec![];
         let g = w.step(&mut players, &inputs, 1.0);
         assert!(g.is_none());
-        assert!((w.puck.vel.x - 3.6788).abs() < 0.01);
+        assert!(w.puck.vel.x.abs() < 1e-6);
     }
 
     #[test]

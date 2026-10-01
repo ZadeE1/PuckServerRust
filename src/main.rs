@@ -3,9 +3,14 @@ mod config;
 mod game;
 mod metrics;
 mod net;
+mod ngo;
 mod persistence;
 mod physics;
+mod physx;
+mod puck_net;
 mod session;
+mod server;
+mod utp;
 
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
