@@ -16,6 +16,7 @@ public static class LifecycleManager
 	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
 	private static void BeforeSceneLoad()
 	{
+		PerformanceMonitor.Initialize();
 		PatchManager.Initialize();
 		EventManager.Initialize();
 		GlobalStateManager.Initialize();
@@ -41,6 +42,7 @@ public static class LifecycleManager
 
 	private static void Update()
 	{
+		PerformanceMonitor.Tick();
 		ApplicationManager.Update(Time.unscaledDeltaTime);
 	}
 
@@ -61,6 +63,7 @@ public static class LifecycleManager
 		SaveManager.Dispose();
 		GlobalStateManager.Dispose();
 		EventManager.Dispose();
+		PerformanceMonitor.Dispose();
 		PatchManager.Dispose();
 		LogManager.Dispose();
 	}
