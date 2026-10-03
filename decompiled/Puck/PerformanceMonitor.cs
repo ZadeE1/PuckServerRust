@@ -71,6 +71,10 @@ public static class PerformanceMonitor
 
 	private static volatile bool enabled;
 
+	private static int flushCount;
+
+	private static bool censusDone;
+
 	public static void Initialize()
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
@@ -80,11 +84,14 @@ public static class PerformanceMonitor
 		{
 			if (File.Exists(DisableMarkerPath))
 			{
+				Directory.CreateDirectory(LogDir);
+				AppendRamLog(0.0, "startup-monitor-disabled");
 				Logger.Info("PerformanceMonitor disabled via " + DisableMarkerPath);
 				return;
 			}
 			Directory.CreateDirectory(LogDir);
 			File.AppendAllText(MsLogPath, $"[{Now()}] === performance log started ===\n");
+			AppendRamLog(0.0, "startup-pre-patch");
 			foreach (MethodBase method in CollectMethods())
 			{
 				try
@@ -118,6 +125,7 @@ public static class PerformanceMonitor
 		stopwatch.Stop();
 		try
 		{
+			AppendRamLog(0.0, "startup-post-patch");
 			File.AppendAllText(MsLogPath, $"[{Now()}] === instrumentation done | {num} functions in {stopwatch.ElapsedMilliseconds}ms | {num2} failed ===\n");
 		}
 		catch (Exception)
@@ -321,6 +329,25 @@ public static class PerformanceMonitor
 			stringBuilder.Append('\n');
 			File.AppendAllText(MsLogPath, stringBuilder.ToString());
 			AppendRamLog(totalSeconds);
+			flushCount++;
+			if (flushCount == 2 && !censusDone)
+			{
+				censusDone = true;
+				try
+				{
+					HeapCensus.Run("performance_log/heap_census.txt");
+				}
+				catch (Exception ex2)
+				{
+					try
+					{
+						File.AppendAllText(MsLogPath, $"[{Now()}] heap census failed: {ex2}\n");
+					}
+					catch (Exception)
+					{
+					}
+				}
+			}
 		}
 		catch (Exception ex)
 		{
@@ -328,7 +355,7 @@ public static class PerformanceMonitor
 		}
 	}
 
-	private static void AppendRamLog(double intervalSeconds)
+	private static void AppendRamLog(double intervalSeconds, string phase = null)
 	{
 		StringBuilder stringBuilder = new StringBuilder();
 		stringBuilder.Append('[').Append(Now()).Append("] working_set=").Append(Mb(GetProcessMemoryBytes(workingSet: true)))
@@ -352,11 +379,16 @@ public static class PerformanceMonitor
 			.Append(GC.CollectionCount(2))
 			.Append(" interval=")
 			.Append(intervalSeconds.ToString("F1", CultureInfo.InvariantCulture))
-			.Append("s\n");
+			.Append("s");
+		if (phase != null)
+		{
+			stringBuilder.Append(" phase=").Append(phase);
+		}
+		stringBuilder.Append('\n');
 		File.AppendAllText(RamLogPath, stringBuilder.ToString());
 	}
 
-	private static long GetProcessMemoryBytes(bool workingSet)
+	public static long GetProcessMemoryBytes(bool workingSet)
 	{
 		try
 		{
