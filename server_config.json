@@ -1,0 +1,13 @@
+{
+  "port": 25565,
+  "name": "MY PUCK SERVER",
+  "maxPlayers": 12,
+  "password": null,
+  "tickRate": 1000,
+  "isPublic": false,
+  "useVoip": false,
+  "useWhitelist": false,
+  "mods": [],
+  "gameMode": "public",
+  "level": "default"
+}
