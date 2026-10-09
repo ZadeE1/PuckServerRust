@@ -50,6 +50,32 @@
 - Compression cache for unmoved objects is implemented (RustEdition) but
   unverified live for the same reason.
 
+## Headless dedicated-server perf
+- `-batchmode -nographics` ignores `Application.targetFrameRate` (measured
+  ~11.5kHz uncapped): `LifecycleManager` paces the loop to `tickRate` with a
+  sleep-remainder budget instead. FixedUpdate/netcode catch up via accumulators.
+- Display-only `MonoBehaviour`s (`UIMinimap`, `UIManager`, `UIPositionSelect`,
+  `UIUsernames`, `MicTester`) are disabled at server start via
+  `RustEdition/HeadlessOptimizations.cs` — Unity then skips their `Update`
+  dispatch entirely (cheaper than per-frame early-out guards at uncapped rates).
+  Crowd stays enabled (wanted) but animates at 30Hz headless.
+- `ApplicationManager.IsDedicatedGameServer` is cached in a static readonly
+  (was a Unity extern call, ~5x/frame). `NetworkStatistics` polls the transport
+  driver only when a sample is due, not every frame.
+- Physics fixed rate is the scene default (100Hz); `serverConfig.tickRate`
+  drives netcode tick + frame pacing only. Do not assume they match.
+
+## Rust native ports (`RustEdition/native/audio_curve/`, one plugin, one surface)
+- Pattern: thin `NativeMath` P/Invoke shim + managed fallback (`RustEdition/NativeMath.cs`).
+  Missing plugin = silent fallback, never a crash. State stays in managed fields.
+- Ported: wind-audio curve + puck collider radius, `PIDController`, sync
+  change-mask (`sync_mask`: integer fast path + bit-exact float mirror, ~16x on
+  `GetChangeMask`). Left managed (too small to beat P/Invoke cost or Unity-bound):
+  `With*`/`Merge`, decompress one-liners, struct copies.
+- Feel-critical ports must prove bit-identity, not just eyeball it: cross-language
+  fuzz against the pristine reference assembly (500k exact matches for the mask),
+  then a live play-test (frozen entities = wrong mask, unmistakable).
+
 ## Conventions
 - Profiler (opt-in): run with `PUCK_PROFILE=1`, output `profiler.jsonl` (JSON lines, 1/sec).
 - Native plugins: `cargo build --release` in `RustEdition/native/audio_curve/` BEFORE

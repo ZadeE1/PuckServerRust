@@ -28,8 +28,8 @@ winget install --id Lima.Lima -e --accept-source-agreements --accept-package-agr
 ```
 
 Add `C:\Program Files\qemu` and the winget `Lima.Lima*` `bin` dir to `PATH`.
-Keep the VM data off `C:` — Lima honors `LIMA_HOME` (e.g. `D:\lima`, set as a
-User env var; the instance here lives at `D:\lima\puck`):
+Keep the VM data off the system drive — Lima honors `LIMA_HOME` (e.g. `D:\lima`, set as a
+User env var; the instance then lives at `<LIMA_HOME>\puck`):
 
 ```powershell
 [Environment]::SetEnvironmentVariable("LIMA_HOME", "D:\lima", "User")
