@@ -1,0 +1,19 @@
+# AGENTS.md
+
+## Read-only reference folders — DO NOT EDIT
+- `RealServerForBasis/` — original Unity dedicated-server install (player, data, managed DLLs).
+  Never modify game files here. Only exception: `server_config.json` when asked.
+  Original DLL is backed up at `Puck_Data/Managed/Puck.dll.orig` (untracked).
+- `decompiledEdition/` — `ilspycmd` (icsharpcode/ILSpy) output for `Puck.dll`, plus the minimal
+  fixes needed to build with 0 errors (HintPaths, `UnityEngine.dll` reference, Netcode
+  `__getTypeName`/`__rpc_exec_stage` patterns, `BundlePlayer` target). Regenerable; do not
+  hand-edit game logic here. Rebuild: `dotnet build decompiledEdition/Puck.csproj`.
+
+## Work here
+- `RustEdition/` — Rust conversion workspace, mirrored from `decompiledEdition/` (sources only,
+  no `bin/`/`obj/`). All conversion work happens here.
+
+## Conventions
+- Profiler (opt-in): run with `PUCK_PROFILE=1`, output `profiler.jsonl` (JSON lines, 1/sec).
+- Verify by execution: rebuild must succeed and the bundled server must boot to
+  "ready to accept clients" before any commit.
