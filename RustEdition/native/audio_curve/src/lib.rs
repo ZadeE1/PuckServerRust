@@ -9,8 +9,215 @@
 //! the cached curves/last-values use plain statics, not locks.
 //!
 //! NOTE: despite the crate name, this library now covers all ported
-//! per-tick helpers (wind audio + net collider radius + PID). One plugin,
-//! one P/Invoke surface.
+//! per-tick helpers (wind audio + net collider radius + PID + sync change-mask).
+//! One plugin, one P/Invoke surface.
+
+// --- Synchronized-object change-mask core (SynchronizedObjectData.GetChangeMask) ---
+//
+// Bit-exact mirror of the managed float math (IEEE f32 ops in C# order;
+// f64 asin like Mathf.Asin). Feel-critical: verified by cross-language fuzz
+// against the ground-truth managed implementation, not just eyeballing.
+
+/// Narrow blittable view of the fields GetChangeMask reads.
+/// Layout must match the C# mirror struct field-for-field.
+/// Field order packs to 32 bytes (u32 last for alignment).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SyncMaskInput {
+    pub x: i16,
+    pub y: i16,
+    pub z: i16,
+    pub rx: i16,
+    pub ry: i16,
+    pub rz: i16,
+    pub rw: i16,
+    pub vx: i16,
+    pub vy: i16,
+    pub vz: i16,
+    pub ax: i16,
+    pub ay: i16,
+    pub az: i16,
+    pub tick_rate_divisor: u8,
+    pub compressed_rotation: u32,
+}
+
+/// Mirrors NetworkingUtils.DecompressShortToFloat:
+/// InverseLerp(-32768, 32767, s) then Lerp(min, max, t), Clamp01 both times.
+fn s_decomp(s: i16, min: f32, max: f32) -> f32 {
+    let t = (s as f32 - -32768.0) / (32767.0 - -32768.0);
+    let tc = if t < 0.0 { 0.0 } else if t > 1.0 { 1.0 } else { t };
+    min + (max - min) * tc
+}
+
+/// Mirrors SynchronizedObjectData.GetAxisChangeMask (Abs + strict >).
+fn s_axis_mask(
+    ax: f32,
+    ay: f32,
+    az: f32,
+    bx: f32,
+    by: f32,
+    bz: f32,
+    thresh: f32,
+    mx: u16,
+    my: u16,
+    mz: u16,
+) -> u16 {
+    let mut m: u16 = 0;
+    if (ax - bx).abs() > thresh {
+        m |= mx;
+    }
+    if (ay - by).abs() > thresh {
+        m |= my;
+    }
+    if (az - bz).abs() > thresh {
+        m |= mz;
+    }
+    m
+}
+
+fn s_quat_dot(a: [f32; 4], b: [f32; 4]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+}
+
+/// Mirrors Quaternion.Normalize (1/sqrt-magnitude, then multiply).
+fn s_quat_normalize(q: [f32; 4]) -> [f32; 4] {
+    let m = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
+    let s = 1.0 / m;
+    [q[0] * s, q[1] * s, q[2] * s, q[3] * s]
+}
+
+/// Mirrors Unity.Netcode.QuaternionCompressor.DecompressQuaternion
+/// (smallest-three, 10 bits each + 2-bit largest index).
+fn s_quat_decompress(mut c: u32) -> [f32; 4] {
+    let largest = (c >> 30) as usize;
+    let mut q = [0.0f32; 4];
+    let mut sumsq = 0.0f32;
+    let mut i: i32 = 3;
+    while i >= 0 {
+        if i as usize != largest {
+            let bits = (c & 0x1FF) as f32;
+            let sign = if (c & 0x200) != 0 { -1.0 } else { 1.0 };
+            let v = sign * (bits * 0.0013837706);
+            q[i as usize] = v;
+            sumsq += v * v;
+            c >>= 10;
+        }
+        i -= 1;
+    }
+    q[largest] = (1.0 - sumsq).sqrt();
+    q
+}
+
+/// Mirrors SynchronizedObjectData.GetAngleDegrees (double-precision asin).
+fn s_angle_deg(a: [f32; 4], b: [f32; 4]) -> f32 {
+    let b = if s_quat_dot(a, b) < 0.0 {
+        [-b[0], -b[1], -b[2], -b[3]]
+    } else {
+        b
+    };
+    let dx = a[0] - b[0];
+    let dy = a[1] - b[1];
+    let dz = a[2] - b[2];
+    let dw = a[3] - b[3];
+    let half = 0.5 * (dx * dx + dy * dy + dz * dz + dw * dw).sqrt();
+    let c = if half < 1.0 { half } else { 1.0 };
+    (4.0 * (c as f64).asin() as f32) * 57.29578
+}
+
+fn s_rot_changed(a: &SyncMaskInput, b: &SyncMaskInput, high: bool) -> bool {
+    if high {
+        if a.rx == b.rx && a.ry == b.ry && a.rz == b.rz {
+            return a.rw != b.rw;
+        }
+        return true;
+    }
+    a.compressed_rotation != b.compressed_rotation
+}
+
+fn s_get_rot(s: &SyncMaskInput, high: bool) -> [f32; 4] {
+    if high {
+        s_quat_normalize([
+            s_decomp(s.rx, -1.0, 1.0),
+            s_decomp(s.ry, -1.0, 1.0),
+            s_decomp(s.rz, -1.0, 1.0),
+            s_decomp(s.rw, -1.0, 1.0),
+        ])
+    } else {
+        s_quat_decompress(s.compressed_rotation)
+    }
+}
+
+/// Mirrors SynchronizedObjectData.GetChangeMask bit-for-bit, with an integer
+/// fast path: identical compressed inputs provably yield an empty mask, so
+/// the ~20 decompressions + quaternion math are skipped entirely.
+#[no_mangle]
+pub extern "C" fn sync_mask(a: SyncMaskInput, b: SyncMaskInput, high_precision: i32) -> u16 {
+    if a.x == b.x
+        && a.y == b.y
+        && a.z == b.z
+        && a.rx == b.rx
+        && a.ry == b.ry
+        && a.rz == b.rz
+        && a.rw == b.rw
+        && a.vx == b.vx
+        && a.vy == b.vy
+        && a.vz == b.vz
+        && a.ax == b.ax
+        && a.ay == b.ay
+        && a.az == b.az
+        && a.compressed_rotation == b.compressed_rotation
+        && a.tick_rate_divisor == b.tick_rate_divisor
+    {
+        return 0;
+    }
+    let high = high_precision != 0;
+    let mut m: u16 = 0;
+    m |= s_axis_mask(
+        s_decomp(a.x, -25.0, 25.0),
+        s_decomp(a.y, -50.0, 50.0),
+        s_decomp(a.z, -50.0, 50.0),
+        s_decomp(b.x, -25.0, 25.0),
+        s_decomp(b.y, -50.0, 50.0),
+        s_decomp(b.z, -50.0, 50.0),
+        0.002,
+        1,
+        2,
+        4,
+    );
+    if s_rot_changed(&a, &b, high)
+        && s_angle_deg(s_get_rot(&a, high), s_get_rot(&b, high)) > 0.05
+    {
+        m |= 8;
+    }
+    m |= s_axis_mask(
+        s_decomp(a.vx, -100.0, 100.0),
+        s_decomp(a.vy, -100.0, 100.0),
+        s_decomp(a.vz, -100.0, 100.0),
+        s_decomp(b.vx, -100.0, 100.0),
+        s_decomp(b.vy, -100.0, 100.0),
+        s_decomp(b.vz, -100.0, 100.0),
+        0.05,
+        16,
+        32,
+        64,
+    );
+    m |= s_axis_mask(
+        s_decomp(a.ax, -100.0, 100.0),
+        s_decomp(a.ay, -100.0, 100.0),
+        s_decomp(a.az, -100.0, 100.0),
+        s_decomp(b.ax, -100.0, 100.0),
+        s_decomp(b.ay, -100.0, 100.0),
+        s_decomp(b.az, -100.0, 100.0),
+        0.1,
+        128,
+        256,
+        512,
+    );
+    if a.tick_rate_divisor != b.tick_rate_divisor {
+        m |= 0x800;
+    }
+    m
+}
 
 // --- PID controller core (PIDController.Update / UpdateAngle) ---
 
@@ -182,6 +389,86 @@ mod tests {
         assert!(m_clamp(f32::NAN, 0.0, 1.0).is_nan()); // NaN passes through
         assert_eq!(m_delta_angle(179.0, -179.0), 2.0);
         assert_eq!(m_delta_angle(-179.0, 179.0), -2.0);
+    }
+
+    fn mask_input(
+        x: i16,
+        y: i16,
+        z: i16,
+        rx: i16,
+        ry: i16,
+        rz: i16,
+        rw: i16,
+        vx: i16,
+        vy: i16,
+        vz: i16,
+        ax: i16,
+        ay: i16,
+        az: i16,
+        comp: u32,
+        div: u8,
+    ) -> SyncMaskInput {
+        SyncMaskInput {
+            x,
+            y,
+            z,
+            rx,
+            ry,
+            rz,
+            rw,
+            vx,
+            vy,
+            vz,
+            ax,
+            ay,
+            az,
+            compressed_rotation: comp,
+            tick_rate_divisor: div,
+        }
+    }
+
+    fn zero_input() -> SyncMaskInput {
+        mask_input(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+    }
+
+    #[test]
+    fn sync_mask_layout_is_32_bytes() {
+        assert_eq!(std::mem::size_of::<SyncMaskInput>(), 32);
+    }
+
+    #[test]
+    fn sync_mask_identical_is_zero() {
+        let a = mask_input(100, -200, 300, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0xDEAD_BEEF, 2);
+        assert_eq!(sync_mask(a, a, 0), 0);
+        assert_eq!(sync_mask(a, a, 1), 0);
+    }
+
+    #[test]
+    fn sync_mask_divisor_only() {
+        let a = zero_input();
+        let mut b = a;
+        b.tick_rate_divisor = 2;
+        assert_eq!(sync_mask(a, b, 0), 0x800);
+    }
+
+    #[test]
+    fn sync_mask_position_bit() {
+        // Decompressed step per short at x range: 50/65535 ~= 0.000763.
+        // 0 vs 3 shorts => ~0.00229 > 0.002 threshold => bit 1.
+        let a = zero_input();
+        let mut b = a;
+        b.x = 3;
+        assert_eq!(sync_mask(a, b, 0) & 1, 1);
+        b.x = 2; // ~0.00153 < 0.002 => no bit (rotation shorts still zero-equal)
+        assert_eq!(sync_mask(a, b, 0), 0);
+    }
+
+    #[test]
+    fn sync_mask_decompress_edge() {
+        // Endpoints map exactly to range ends.
+        assert_eq!(s_decomp(-32768, -25.0, 25.0), -25.0);
+        assert_eq!(s_decomp(32767, -25.0, 25.0), 25.0);
+        assert_eq!(s_decomp(0, -1.0, 1.0), s_decomp(0, -1.0, 1.0));
     }
 }
 

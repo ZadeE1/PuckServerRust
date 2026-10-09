@@ -109,6 +109,28 @@ public struct SynchronizedObjectData : INetworkSerializable
 
 	public bool IsAsleep => (ChangeMask & 0x1000) != 0;
 
+	// Packs the fields sync_mask reads. Field order mirrors SyncMaskInput (Rust).
+	private NativeMath.SyncMaskInput ToMaskInput()
+	{
+		NativeMath.SyncMaskInput input;
+		input.X = X;
+		input.Y = Y;
+		input.Z = Z;
+		input.Rx = Rx;
+		input.Ry = Ry;
+		input.Rz = Rz;
+		input.Rw = Rw;
+		input.Vx = Vx;
+		input.Vy = Vy;
+		input.Vz = Vz;
+		input.Ax = Ax;
+		input.Ay = Ay;
+		input.Az = Az;
+		input.TickRateDivisor = TickRateDivisor;
+		input.CompressedRotation = CompressedRotation;
+		return input;
+	}
+
 	public Quaternion Rotation => GetRotation((ChangeMask & 0x400) != 0);
 
 	public Vector3 LinearVelocity => new Vector3(NetworkingUtils.DecompressShortToFloat(Vx, -100f, 100f), NetworkingUtils.DecompressShortToFloat(Vy, -100f, 100f), NetworkingUtils.DecompressShortToFloat(Vz, -100f, 100f));
@@ -166,6 +188,11 @@ public struct SynchronizedObjectData : INetworkSerializable
 	public ushort GetChangeMask(SynchronizedObjectData other, bool useHighPrecisionRotation)
 	{
 		long syncPerfStart = SyncPerf.Enter();
+		if (NativeMath.TryGetChangeMask(ToMaskInput(), other.ToMaskInput(), useHighPrecisionRotation, out ushort nativeMask))
+		{
+			SyncPerf.Exit(SyncPerf.DataGetChangeMask, syncPerfStart);
+			return nativeMask;
+		}
 		ushort num = GetAxisChangeMask(GetPosition(), other.GetPosition(), 0.002f, 1, 2, 4);
 		if (HasRotationChanged(other, useHighPrecisionRotation) && GetAngleDegrees(GetRotation(useHighPrecisionRotation), other.GetRotation(useHighPrecisionRotation)) > 0.05f)
 		{
