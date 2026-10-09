@@ -24,15 +24,18 @@ public struct SynchronizedObjectTickHeader : INetworkSerializable
 
 	public SynchronizedObjectTickHeader(ushort sequenceNumber, double serverTime, float timeScale, float tickInterval)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		ChangeMask = 3;
 		SequenceNumber = sequenceNumber;
 		ServerTime = serverTime;
 		TimeScale = timeScale;
 		TickInterval = tickInterval;
+		SyncPerf.Exit(SyncPerf.TickHeaderCtor, syncPerfStart);
 	}
 
 	public byte GetChangeMask(SynchronizedObjectTickHeader other)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		byte b = 0;
 		if (TimeScale != other.TimeScale)
 		{
@@ -42,13 +45,16 @@ public struct SynchronizedObjectTickHeader : INetworkSerializable
 		{
 			b |= 2;
 		}
+		SyncPerf.Exit(SyncPerf.TickHeaderGetChangeMask, syncPerfStart);
 		return b;
 	}
 
 	public SynchronizedObjectTickHeader WithComponentMask(byte componentMask)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		SynchronizedObjectTickHeader result = this;
 		result.ChangeMask = (byte)(componentMask & 3);
+		SyncPerf.Exit(SyncPerf.TickHeaderWithComponentMask, syncPerfStart);
 		return result;
 	}
 

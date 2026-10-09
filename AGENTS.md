@@ -18,13 +18,37 @@
   Copy-to-target flow: `docker/build.sh [dir]` (any Docker host) produces
   `<dir>/server/` + `<dir>/run.sh`; copy `<dir>` to the target and run `./run.sh`.
   Never bakes in Windows player files.
+- `vm/` — Lima test-VM definition + deploy scripts for Linux testing on a
+  Windows host (`vm/puck.yaml`, `vm/deploy.ps1`, `vm/puck@.service`). Details
+  and host gotchas: `vm/README.md`.
 
-## Work in progress (parked, not abandoned)
-- Sync-pipeline perf (`SynchronizedObject*`, 33 types): profiler freezes live play when these
-  are instrumented; `PUCK_PROFILE_SKIP` prefix exclusions bisect it (`*` = writer only).
-  Status: `SynchronizedObject`-excluded plays fine; full set freezes. Next: split the 33
-  into halves and play-test each. Compression cache for unmoved objects is implemented
-  (RustEdition) but unverified live for the same reason.
+## Sync-pipeline perf (active)
+- The Harmony profiler does not merely slow the sync path — patching the
+  change-detection types **breaks sync logic**: initial full sends still arrive
+  (spawns visible) but every delta computes an empty change-mask, so entities
+  freeze after spawn (stuck stick, static pucks). Symptom is distinct from a
+  freeze: the server stays up, ticks flow, no errors.
+- Proven profiler-BREAKING (never Harmony-instrument): `SynchronizedObjectSnapshot`,
+  `SynchronizedObjectData`, `SynchronizedObjectTickHeader`.
+- Proven profiler-SAFE: `SynchronizedObjectManager`, `SynchronizedObject` (bare),
+  `SynchronizedObjectSendPlanner`, `SynchronizedObjectSendBuffers`,
+  `SynchronizedObjectLodSelector`, `SynchronizedObjectRegistry`.
+- Zero-cost on a dedicated server, never instrument: `SynchronizedObjectClientReceiver`
+  (guarded by `!IsServer`) and everything reachable only through it
+  (`Interpolator`, `Smoothing`, `Timeline`, `SampleRing`, `Playback`,
+  `ReceivedState`, `ClientDiagnostics*`).
+- Method: single-type rounds via `PUCK_PROFILE_SKIP` semicolon prefixes.
+  Prefix collisions to respect: the bare `SynchronizedObject` name covers all
+  types (can never be excluded alone); `Manager` covers `ManagerController`;
+  `Sample` covers `SampleRing`; `ServerDiagnostics`/`ClientDiagnostics` cover
+  their `*Data` variants.
+- Steady state: instrument everything EXCEPT `Snapshot`/`Data`/`TickHeader` +
+  the client/interp/diag/config groups above. Change-mask cost still shows up
+  inclusively via `PlanObject`/`Server_Tick` callers.
+- The 3 incompatible types get custom in-method timing instead (`SyncPerf`,
+  own output file) — see `RustEdition/SyncPerf.cs`.
+- Compression cache for unmoved objects is implemented (RustEdition) but
+  unverified live for the same reason.
 
 ## Conventions
 - Profiler (opt-in): run with `PUCK_PROFILE=1`, output `profiler.jsonl` (JSON lines, 1/sec).

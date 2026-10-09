@@ -102,7 +102,7 @@ public static class PerformanceProfiler
 	{
 		for (Type t = type; t != null; t = t.DeclaringType)
 		{
-			if (t == typeof(PerformanceProfiler))
+			if (t == typeof(PerformanceProfiler) || t == typeof(SyncPerf))
 			{
 				return true;
 			}

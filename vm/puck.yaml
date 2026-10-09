@@ -60,9 +60,12 @@ provision:
       [Service]
       Type=simple
       User=%i
-      # Profiler is opt-in; SKIP keeps the known-freezing sync pipeline out (see AGENTS.md).
+      # Profiler steady state: Harmony instruments the proven-safe set; the 3
+      # Harmony-breaking types (Snapshot/Data/TickHeader) use in-method SyncPerf
+      # timing to its own file instead. See AGENTS.md.
       Environment=PUCK_PROFILE=1
-      Environment=PUCK_PROFILE_SKIP=SynchronizedObject
+      Environment=PUCK_SYNC_PROFILE=1
+      Environment="PUCK_PROFILE_SKIP=SynchronizedObjectClientDiagnostics;SynchronizedObjectClientReceiver;SynchronizedObjectController;SynchronizedObjectData;SynchronizedObjectDriveCadence;SynchronizedObjectInterpolator;SynchronizedObjectLodCounts;SynchronizedObjectLodSelection;SynchronizedObjectLodSource;SynchronizedObjectManagerController;SynchronizedObjectNetworkSmoothingSettings;SynchronizedObjectPlayback;SynchronizedObjectPlayerDiagnosticsData;SynchronizedObjectPose;SynchronizedObjectSample;SynchronizedObjectSendState;SynchronizedObjectServerDiagnostics;SynchronizedObjectSmoothing;SynchronizedObjectSnapshot;SynchronizedObjectTickHeader;SynchronizedObjectTimeline;SynchronizedObjectReceivedState;SynchronizedObjectBandSettings"
       ExecStart=/bin/bash -c 'cd "$HOME/puck-server/server" && export LD_LIBRARY_PATH="$PWD:$LD_LIBRARY_PATH" && exec ./Puck -batchmode -nographics'
       Restart=on-failure
       RestartSec=5

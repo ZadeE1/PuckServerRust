@@ -67,6 +67,7 @@ public static class PatchManager
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		VisualElementHarmonyPatch.Patch();
 		PerformanceProfiler.MaybeStart();
+		SyncPerf.MaybeStart();
 		MemoryReporter.MaybeStart();
 		ApplyDedicatedServerTuning();
 		stopwatch.Stop();
@@ -76,6 +77,7 @@ public static class PatchManager
 	public static void Dispose()
 	{
 		PerformanceProfiler.Stop();
+		SyncPerf.Stop();
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		VisualElementHarmonyPatch.Unpatch();
 		stopwatch.Stop();

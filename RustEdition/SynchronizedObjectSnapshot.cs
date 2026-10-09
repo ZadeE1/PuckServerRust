@@ -35,6 +35,7 @@ public class SynchronizedObjectSnapshot
 
 	public void Capture(SynchronizedObjectRegistry registry)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		objects.Clear();
 		positions.Clear();
 		data.Clear();
@@ -64,6 +65,7 @@ public class SynchronizedObjectSnapshot
 				}
 			}
 		}
+		SyncPerf.Exit(SyncPerf.SnapshotCapture, syncPerfStart);
 	}
 
 	public void Clear()

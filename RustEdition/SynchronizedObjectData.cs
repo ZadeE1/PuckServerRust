@@ -133,6 +133,7 @@ public struct SynchronizedObjectData : INetworkSerializable
 
 	public SynchronizedObjectData(ulong networkObjectId, Vector3 position, Quaternion rotation, Vector3 linearVelocity, Vector3 angularVelocity)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		NetworkObjectId = (ushort)networkObjectId;
 		ChangeMask = 4095;
 		X = NetworkingUtils.CompressFloatToShort(position.x, -25f, 25f);
@@ -150,17 +151,21 @@ public struct SynchronizedObjectData : INetworkSerializable
 		Ay = NetworkingUtils.CompressFloatToShort(angularVelocity.y, -100f, 100f);
 		Az = NetworkingUtils.CompressFloatToShort(angularVelocity.z, -100f, 100f);
 		TickRateDivisor = 1;
+		SyncPerf.Exit(SyncPerf.DataCtor, syncPerfStart);
 	}
 
 	public SynchronizedObjectData WithTickRateDivisor(byte tickRateDivisor)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		SynchronizedObjectData result = this;
 		result.TickRateDivisor = tickRateDivisor;
+		SyncPerf.Exit(SyncPerf.DataWithTickRateDivisor, syncPerfStart);
 		return result;
 	}
 
 	public ushort GetChangeMask(SynchronizedObjectData other, bool useHighPrecisionRotation)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		ushort num = GetAxisChangeMask(GetPosition(), other.GetPosition(), 0.002f, 1, 2, 4);
 		if (HasRotationChanged(other, useHighPrecisionRotation) && GetAngleDegrees(GetRotation(useHighPrecisionRotation), other.GetRotation(useHighPrecisionRotation)) > 0.05f)
 		{
@@ -172,29 +177,35 @@ public struct SynchronizedObjectData : INetworkSerializable
 		{
 			num |= 0x800;
 		}
+		SyncPerf.Exit(SyncPerf.DataGetChangeMask, syncPerfStart);
 		return num;
 	}
 
 	public SynchronizedObjectData WithAsleep()
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		SynchronizedObjectData result = this;
 		result.ChangeMask |= 4096;
+		SyncPerf.Exit(SyncPerf.DataWithAsleep, syncPerfStart);
 		return result;
 	}
 
 	public SynchronizedObjectData WithComponentMask(ushort componentMask, bool useHighPrecisionRotation)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		SynchronizedObjectData result = this;
 		result.ChangeMask = (ushort)(componentMask & 0xBFF);
 		if (useHighPrecisionRotation && (result.ChangeMask & 8) != 0)
 		{
 			result.ChangeMask |= 1024;
 		}
+		SyncPerf.Exit(SyncPerf.DataWithComponentMask, syncPerfStart);
 		return result;
 	}
 
 	public SynchronizedObjectData Merge(SynchronizedObjectData changes)
 	{
+		long syncPerfStart = SyncPerf.Enter();
 		SynchronizedObjectData result = this;
 		if ((changes.ChangeMask & 1) != 0)
 		{
@@ -246,6 +257,7 @@ public struct SynchronizedObjectData : INetworkSerializable
 		}
 		ushort num = (((changes.ChangeMask & 8) != 0) ? changes.ChangeMask : ChangeMask);
 		result.ChangeMask = (ushort)(0xBFF | (num & 0x400));
+		SyncPerf.Exit(SyncPerf.DataMerge, syncPerfStart);
 		return result;
 	}
 
