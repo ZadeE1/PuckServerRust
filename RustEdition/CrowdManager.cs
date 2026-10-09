@@ -24,8 +24,21 @@ public class CrowdManager : MonoBehaviourSingleton<CrowdManager>
 
 	private int updateBatch;
 
+	private float headlessAccumulator;
+
 	private void Update()
 	{
+		if (ApplicationManager.IsDedicatedGameServer)
+		{
+			// ponytail: nothing renders headless; step crowd animation at 30Hz
+			// instead of per-frame. Deltas stay real-time so motion is equivalent.
+			headlessAccumulator += Time.deltaTime;
+			if (headlessAccumulator < 1f / 30f)
+			{
+				return;
+			}
+			headlessAccumulator -= 1f / 30f;
+		}
 		int count = crowdMembers.Count;
 		if (count != 0)
 		{

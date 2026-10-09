@@ -1,0 +1,2 @@
+# Shell scripts must stay LF: they run on Linux targets (and under WSL/Git Bash).
+*.sh text eol=lf

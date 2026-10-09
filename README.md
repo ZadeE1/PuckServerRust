@@ -12,6 +12,7 @@ decompilation are kept read-only; all work happens in `RustEdition/`.
 | `decompiledEdition/` | `ilspycmd` output for `Puck.dll`, fixed up to build with 0 errors. Regenerable, do not hand-edit. |
 | `RustEdition/` | Conversion workspace, mirrored from `decompiledEdition/`. All code work happens here. |
 | `docker/` | Linux dedicated-server builder (`Dockerfile.builder`) plus the copy-to-target scripts (`build.sh`, `run.sh`). |
+| `vm/` | Lima test VM on a Windows host (`puck.yaml`, `deploy.ps1`, `puck@.service`, `README.md`). |
 
 ## Requirements
 

@@ -22,7 +22,10 @@ public static class ApplicationManager
 
 	private static float diagnosticsTime = 0f;
 
-	public static bool IsDedicatedGameServer => Application.isBatchMode;
+	// ponytail: cache the Unity extern call — this guard runs ~5x/frame at uncapped batchmode rates.
+	private static readonly bool isDedicatedGameServer = Application.isBatchMode;
+
+	public static bool IsDedicatedGameServer => isDedicatedGameServer;
 
 	public static ushort Version
 	{

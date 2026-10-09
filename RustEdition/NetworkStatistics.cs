@@ -56,7 +56,15 @@ public class NetworkStatistics : MonoBehaviour
 	private void Update()
 	{
 		float diagnosticsInterval = DiagnosticsInterval;
-		if (diagnosticsInterval <= 0f)
+		// ponytail: check the interval BEFORE polling the driver — the poll + stall
+	// clock are Unity/transport externs that used to run ~11k times/sec headless
+	// to emit a ~1Hz event.
+	if (diagnosticsInterval <= 0f)
+		{
+			return;
+		}
+		diagnosticsTime += Time.unscaledDeltaTime;
+		if (diagnosticsTime < diagnosticsInterval)
 		{
 			return;
 		}
@@ -66,11 +74,7 @@ public class NetworkStatistics : MonoBehaviour
 			return;
 		}
 		RecordStall(driverStatistics.RxTotalPackets);
-		diagnosticsTime += Time.unscaledDeltaTime;
-		if (!(diagnosticsTime < diagnosticsInterval))
-		{
-			TakeDiagnostics(in driverStatistics);
-		}
+		TakeDiagnostics(in driverStatistics);
 	}
 
 	private void ResetDiagnostics()

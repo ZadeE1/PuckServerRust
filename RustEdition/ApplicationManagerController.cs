@@ -162,6 +162,7 @@ public static class ApplicationManagerController
 		if (ApplicationManager.IsDedicatedGameServer)
 		{
 			ApplicationManager.SetTargetFrameRate(serverConfig.tickRate);
+			HeadlessOptimizations.Apply();
 		}
 	}
 }

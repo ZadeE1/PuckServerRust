@@ -4,3 +4,4 @@
 RustEdition/native/audio_curve/target/
 *.orig
 *.log
+puck-linux-server/

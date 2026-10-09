@@ -37,6 +37,12 @@ public class PIDController
 
 	public float Update(float deltaTime, float currentValue, float targetValue)
 	{
+		int di = (derivativeInitialized ? 1 : 0);
+		if (NativeMath.TryPidUpdate(ref errorLast, ref valueLast, ref integrationStored, ref derivativeLast, ref di, proportionalGain, integralGain, integralSaturation, derivativeGain, derivativeSmoothing, outputMin, outputMax, (int)derivativeMeasurement, deltaTime, currentValue, targetValue, 0, out float result))
+		{
+			derivativeInitialized = (di != 0);
+			return result;
+		}
 		if (deltaTime <= 0f)
 		{
 			return 0f;
@@ -66,6 +72,12 @@ public class PIDController
 
 	public float UpdateAngle(float deltaTime, float currentValue, float targetValue)
 	{
+		int di = (derivativeInitialized ? 1 : 0);
+		if (NativeMath.TryPidUpdate(ref errorLast, ref valueLast, ref integrationStored, ref derivativeLast, ref di, proportionalGain, integralGain, integralSaturation, derivativeGain, derivativeSmoothing, outputMin, outputMax, (int)derivativeMeasurement, deltaTime, currentValue, targetValue, 1, out float result))
+		{
+			derivativeInitialized = (di != 0);
+			return result;
+		}
 		if (deltaTime <= 0f)
 		{
 			return 0f;

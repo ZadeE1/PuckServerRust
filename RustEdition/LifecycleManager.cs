@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
@@ -39,9 +41,35 @@ public static class LifecycleManager
 		RegisterUpdate();
 	}
 
+	private static readonly Stopwatch frameWatch = Stopwatch.StartNew();
+
 	private static void Update()
 	{
 		ApplicationManager.Update(Time.unscaledDeltaTime);
+		PaceHeadlessFrame();
+	}
+
+	// ponytail: -batchmode ignores Application.targetFrameRate, so the loop spins
+	// uncapped (~11.5kHz measured) and every per-frame guard costs ~50x. Sleep the
+	// remainder of a tickRate-paced budget. FixedUpdate and the netcode pump catch
+	// up via accumulators; physics timestep is unchanged.
+	private static void PaceHeadlessFrame()
+	{
+		if (!ApplicationManager.IsDedicatedGameServer)
+		{
+			return;
+		}
+		int rate = Application.targetFrameRate;
+		if (rate <= 0)
+		{
+			rate = 200;
+		}
+		long remaining = Stopwatch.Frequency / rate - frameWatch.ElapsedTicks;
+		if (remaining > Stopwatch.Frequency / 1000)
+		{
+			Thread.Sleep((int)(remaining * 1000 / Stopwatch.Frequency));
+		}
+		frameWatch.Restart();
 	}
 
 	public static void Dispose()
