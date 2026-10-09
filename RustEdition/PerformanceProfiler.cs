@@ -10,6 +10,9 @@ using HarmonyLib;
 
 // ponytail: exact per-call timing via one shared Harmony prefix/postfix; MethodBase dict keys avoid per-call string allocs.
 // The profiler never patches itself (declaring-chain guard) and uses no lambdas on the hot path, so it cannot recurse.
+// Per-call alloc tracking is deliberately absent: Unity's Mono stubs GC.GetAllocatedBytesForCurrentThread (always 0)
+// and calling it per-invocation stalls the main thread under load. Heap is still sampled per second via gcHeapBytes.
+// Any hot-path failure disables recording (dead flag) so the profiler can never break gameplay.
 // Enable with env PUCK_PROFILE=1 (optional PUCK_PROFILE_PATH, default ./profiler.jsonl). Off by default = zero overhead.
 public static class PerformanceProfiler
 {
@@ -19,21 +22,23 @@ public static class PerformanceProfiler
 	private static readonly ThreadLocal<Stack<Frame>> stacks = new ThreadLocal<Stack<Frame>>();
 	private static Thread writer;
 	private static volatile bool running;
+	private static volatile bool dead;
+	private static int failures;
+	private static int heartbeatCounter;
+	private static int skippedTypes;
 	private static string outputPath = "profiler.jsonl";
-	private static bool allocSupported;
+	private static string[] skipPrefixes = new string[0];
 
 	private struct Frame
 	{
 		public MethodBase method;
 		public long startTicks;
-		public long startAlloc;
 	}
 
 	private sealed class Stats
 	{
 		public long calls;
 		public long ticks;
-		public long allocBytes;
 	}
 
 	public static void MaybeStart()
@@ -55,14 +60,10 @@ public static class PerformanceProfiler
 		{
 			outputPath = path;
 		}
-		try
+		string skip = Environment.GetEnvironmentVariable("PUCK_PROFILE_SKIP");
+		if (!string.IsNullOrEmpty(skip))
 		{
-			GC.GetAllocatedBytesForCurrentThread();
-			allocSupported = true;
-		}
-		catch
-		{
-			allocSupported = false;
+			skipPrefixes = skip.Split(';');
 		}
 		MethodInfo prefix = typeof(PerformanceProfiler).GetMethod("Prefix", BindingFlags.Static | BindingFlags.NonPublic);
 		MethodInfo postfix = typeof(PerformanceProfiler).GetMethod("Postfix", BindingFlags.Static | BindingFlags.NonPublic);
@@ -78,7 +79,7 @@ public static class PerformanceProfiler
 		writer.IsBackground = true;
 		writer.Name = "PerformanceProfiler";
 		writer.Start();
-		Logger.Info("Profiling " + patched + " methods -> " + outputPath + " (alloc tracking: " + (allocSupported ? "on" : "off") + ")");
+		Logger.Info("Profiling " + patched + " methods (" + skippedTypes + " types skipped) -> " + outputPath);
 	}
 
 	public static void Stop()
@@ -109,9 +110,27 @@ public static class PerformanceProfiler
 		return false;
 	}
 
+	private static bool IsSkipped(Type type)
+	{
+		if (skipPrefixes.Length == 0)
+		{
+			return false;
+		}
+		string name = type.FullName;
+		foreach (string prefix in skipPrefixes)
+		{
+			if (prefix == "*" || (name != null && name.StartsWith(prefix)))
+			{
+				skippedTypes++;
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static int PatchType(Type type, HarmonyMethod prefix, HarmonyMethod postfix)
 	{
-		if (IsProfilerCode(type))
+		if (IsProfilerCode(type) || IsSkipped(type))
 		{
 			return 0;
 		}
@@ -138,6 +157,15 @@ public static class PerformanceProfiler
 		return count;
 	}
 
+	private static void DisableOnFailure()
+	{
+		if (Interlocked.Increment(ref failures) > 1000 && !dead)
+		{
+			dead = true;
+			Logger.Error("PROFILER AUTO-DISABLED after " + failures + " hot-path failures; recording stopped, game unaffected");
+		}
+	}
+
 	private static Stack<Frame> StackForThread()
 	{
 		Stack<Frame> stack = stacks.Value;
@@ -151,45 +179,62 @@ public static class PerformanceProfiler
 
 	private static void Prefix(MethodBase __originalMethod)
 	{
-		Stack<Frame> stack = StackForThread();
-		if (stack.Count > 512)
+		if (dead)
 		{
-			stack.Clear();
+			return;
 		}
-		Frame frame;
-		frame.method = __originalMethod;
-		frame.startTicks = Stopwatch.GetTimestamp();
-		frame.startAlloc = allocSupported ? GC.GetAllocatedBytesForCurrentThread() : 0L;
-		stack.Push(frame);
+		try
+		{
+			Stack<Frame> stack = StackForThread();
+			if (stack.Count > 512)
+			{
+				stack.Clear();
+			}
+			Frame frame;
+			frame.method = __originalMethod;
+			frame.startTicks = Stopwatch.GetTimestamp();
+			stack.Push(frame);
+		}
+		catch
+		{
+			DisableOnFailure();
+		}
 	}
 
 	private static void Postfix(MethodBase __originalMethod)
 	{
-		Stack<Frame> stack = StackForThread();
-		if (stack.Count == 0)
+		if (dead)
 		{
 			return;
 		}
-		Frame frame = stack.Pop();
-		long elapsed = Stopwatch.GetTimestamp() - frame.startTicks;
-		Stats s;
-		if (!stats.TryGetValue(frame.method, out s))
+		try
 		{
-			Stats fresh = new Stats();
-			if (stats.TryAdd(frame.method, fresh))
+			Stack<Frame> stack = StackForThread();
+			if (stack.Count == 0)
 			{
-				s = fresh;
+				return;
 			}
-			else
+			Frame frame = stack.Pop();
+			long elapsed = Stopwatch.GetTimestamp() - frame.startTicks;
+			Stats s;
+			if (!stats.TryGetValue(frame.method, out s))
 			{
-				stats.TryGetValue(frame.method, out s);
+				Stats fresh = new Stats();
+				if (stats.TryAdd(frame.method, fresh))
+				{
+					s = fresh;
+				}
+				else
+				{
+					stats.TryGetValue(frame.method, out s);
+				}
 			}
+			Interlocked.Increment(ref s.calls);
+			Interlocked.Add(ref s.ticks, elapsed);
 		}
-		Interlocked.Increment(ref s.calls);
-		Interlocked.Add(ref s.ticks, elapsed);
-		if (allocSupported)
+		catch
 		{
-			Interlocked.Add(ref s.allocBytes, GC.GetAllocatedBytesForCurrentThread() - frame.startAlloc);
+			DisableOnFailure();
 		}
 	}
 
@@ -202,6 +247,10 @@ public static class PerformanceProfiler
 			try
 			{
 				WriteSnapshot(perMs);
+				if (Interlocked.Increment(ref heartbeatCounter) % 30 == 0)
+				{
+					Logger.Info("profiler heartbeat: " + stats.Count + " methods tracked, failures=" + failures + ", dead=" + dead);
+				}
 			}
 			catch
 			{
@@ -220,7 +269,6 @@ public static class PerformanceProfiler
 				continue;
 			}
 			long ticks = Interlocked.Exchange(ref kv.Value.ticks, 0);
-			long alloc = Interlocked.Exchange(ref kv.Value.allocBytes, 0);
 			double ms = ticks / perMs;
 			MethodBase m = kv.Key;
 			functions.Add(new Dictionary<string, object>
@@ -229,7 +277,7 @@ public static class PerformanceProfiler
 				{ "calls", calls },
 				{ "ms", ms },
 				{ "avgUs", ms * 1000.0 / calls },
-				{ "allocBytes", alloc }
+				{ "allocBytes", 0L }
 			});
 		}
 		functions.Sort(CompareByMsDesc);
@@ -237,6 +285,8 @@ public static class PerformanceProfiler
 		{
 			{ "t", DateTime.UtcNow.ToString("o") },
 			{ "gcHeapBytes", GC.GetTotalMemory(false) },
+			{ "failures", failures },
+			{ "dead", dead },
 			{ "functions", functions }
 		}) + "\n");
 	}
