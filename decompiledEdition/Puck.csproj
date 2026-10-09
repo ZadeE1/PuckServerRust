@@ -1,0 +1,134 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Puck</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>netstandard2.1</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Netcode.Runtime">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.Netcode.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.AnimationModule.dll</HintPath>
+    </Reference>
+    <Reference Include="AYellowpaper.SerializedCollections">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/AYellowpaper.SerializedCollections.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClothModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.ClothModule.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.TextMeshPro.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Collections">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.Collections.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Universal.Runtime">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Linework">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Linework.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Core.Runtime">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.RenderPipelines.Core.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Networking.Transport">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.Networking.Transport.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIElementsModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.UIElementsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="com.rlabrecque.steamworks.net">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/com.rlabrecque.steamworks.net.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="SocketIOClient">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/SocketIOClient.dll</HintPath>
+    </Reference>
+    <Reference Include="SocketIOClient.Common">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/SocketIOClient.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Splines">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.Splines.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSimpleTcp">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/SuperSimpleTcp.dll</HintPath>
+    </Reference>
+    <Reference Include="uPnP">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/uPnP.dll</HintPath>
+    </Reference>
+    <Reference Include="Sirenix.Utilities">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Sirenix.Utilities.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="Humanizer">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Humanizer.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Mathematics">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/Unity.Mathematics.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestTextureModule">
+      <HintPath>../RealServerForBasis/Puck_Data/Managed/UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <!-- ponytail: keep player exe next to built DLL so output folder is the runnable bundle -->
+  <Target Name="BundlePlayer" AfterTargets="Build">
+    <ItemGroup>
+      <PlayerExe Include="../RealServerForBasis/Puck.exe" />
+      <PlayerExe Include="../RealServerForBasis/UnityPlayer.dll" />
+      <PlayerExe Include="../RealServerForBasis/UnityCrashHandler64.exe" />
+      <PlayerExe Include="../RealServerForBasis/steamclient.dll" />
+      <PlayerExe Include="../RealServerForBasis/steam_appid.txt" />
+      <PlayerExe Include="../RealServerForBasis/*.json" />
+      <PlayerData Include="../RealServerForBasis/Puck_Data/**/*" />
+      <PlayerData Remove="../RealServerForBasis/Puck_Data/Managed/*.orig" />
+      <PlayerMono Include="../RealServerForBasis/MonoBleedingEdge/**/*" />
+      <PlayerPlugins Include="../RealServerForBasis/Plugins/**/*" />
+      <PlayerD3D Include="../RealServerForBasis/D3D12/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PlayerExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(PlayerData)" DestinationFiles="@(PlayerData->'$(OutDir)Puck_Data/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(PlayerMono)" DestinationFiles="@(PlayerMono->'$(OutDir)MonoBleedingEdge/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(PlayerPlugins)" DestinationFiles="@(PlayerPlugins->'$(OutDir)Plugins/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(PlayerD3D)" DestinationFiles="@(PlayerD3D->'$(OutDir)D3D12/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(OutDir)Puck_Data/Managed" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

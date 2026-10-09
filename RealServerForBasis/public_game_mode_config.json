@@ -1,0 +1,19 @@
+{
+  "phaseDurationMap": {
+    "None": 0,
+    "Warmup": 60,
+    "PreGame": 10,
+    "FaceOff": 4,
+    "Play": 300,
+    "BlueScore": 4,
+    "RedScore": 4,
+    "Replay": 9,
+    "Intermission": 10,
+    "GameOver": 30,
+    "PostGame": 10
+  },
+  "spawnDelay": 10,
+  "maxPeriods": 3,
+  "goalSlowMotion": true,
+  "goalieCreaseProtection": true
+}
