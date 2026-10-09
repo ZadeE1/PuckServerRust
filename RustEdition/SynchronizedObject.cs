@@ -30,6 +30,55 @@ public class SynchronizedObject : NetworkBehaviour
 
 	private SynchronizedObjectPose drivenPose;
 
+	// ponytail: server-sync compression cache. Bit-identical raw poses compress
+	// to bit-identical bytes, so reusing the cached record skips 13 float->short
+	// compressions per tick with zero wire-visible change. Component-wise ==
+	// (never Unity's approximate Vector3/Quaternion ==) keeps that guarantee exact.
+	private bool hasCachedSyncData;
+
+	private SynchronizedObjectPose cachedSyncPose;
+
+	private SynchronizedObjectData cachedSyncData;
+
+	public bool TryGetCachedSyncData(in SynchronizedObjectPose pose, out SynchronizedObjectData data)
+	{
+		if (hasCachedSyncData && PosesEqual(in cachedSyncPose, in pose))
+		{
+			data = cachedSyncData;
+			return true;
+		}
+		data = default(SynchronizedObjectData);
+		return false;
+	}
+
+	public void StoreSyncData(in SynchronizedObjectPose pose, in SynchronizedObjectData data)
+	{
+		cachedSyncPose = pose;
+		cachedSyncData = data;
+		hasCachedSyncData = true;
+	}
+
+	private static bool PosesEqual(in SynchronizedObjectPose a, in SynchronizedObjectPose b)
+	{
+		if (a.Position.x != b.Position.x || a.Position.y != b.Position.y || a.Position.z != b.Position.z)
+		{
+			return false;
+		}
+		if (a.Rotation.x != b.Rotation.x || a.Rotation.y != b.Rotation.y || a.Rotation.z != b.Rotation.z || a.Rotation.w != b.Rotation.w)
+		{
+			return false;
+		}
+		if (a.LinearVelocity.x != b.LinearVelocity.x || a.LinearVelocity.y != b.LinearVelocity.y || a.LinearVelocity.z != b.LinearVelocity.z)
+		{
+			return false;
+		}
+		if (a.AngularVelocity.x != b.AngularVelocity.x || a.AngularVelocity.y != b.AngularVelocity.y || a.AngularVelocity.z != b.AngularVelocity.z)
+		{
+			return false;
+		}
+		return true;
+	}
+
 	public bool IsDrivenExternally => Rigidbody.isKinematic;
 
 	private void Awake()

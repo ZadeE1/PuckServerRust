@@ -51,7 +51,17 @@ public class SynchronizedObjectSnapshot
 				SynchronizedObjectPose pose = @object.GetPose();
 				objects.Add(@object);
 				positions.Add(pose.Position);
-				data.Add(new SynchronizedObjectData(networkObjectId, pose.Position, pose.Rotation, pose.LinearVelocity, pose.AngularVelocity));
+				SynchronizedObjectData cachedData;
+				if (@object.TryGetCachedSyncData(in pose, out cachedData))
+				{
+					data.Add(cachedData);
+				}
+				else
+				{
+					SynchronizedObjectData freshData = new SynchronizedObjectData(networkObjectId, pose.Position, pose.Rotation, pose.LinearVelocity, pose.AngularVelocity);
+					@object.StoreSyncData(in pose, in freshData);
+					data.Add(freshData);
+				}
 			}
 		}
 	}
