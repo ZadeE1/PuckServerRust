@@ -13,6 +13,13 @@
 - `RustEdition/` — Rust conversion workspace, mirrored from `decompiledEdition/` (sources only,
   no `bin/`/`obj/`). All conversion work happens here.
 
+## Work in progress (parked, not abandoned)
+- Sync-pipeline perf (`SynchronizedObject*`, 33 types): profiler freezes live play when these
+  are instrumented; `PUCK_PROFILE_SKIP` prefix exclusions bisect it (`*` = writer only).
+  Status: `SynchronizedObject`-excluded plays fine; full set freezes. Next: split the 33
+  into halves and play-test each. Compression cache for unmoved objects is implemented
+  (RustEdition) but unverified live for the same reason.
+
 ## Conventions
 - Profiler (opt-in): run with `PUCK_PROFILE=1`, output `profiler.jsonl` (JSON lines, 1/sec).
 - Native plugins: `cargo build --release` in `RustEdition/native/audio_curve/` BEFORE
