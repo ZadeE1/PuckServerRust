@@ -110,7 +110,9 @@
     </Reference>
   </ItemGroup>
   <!-- ponytail: keep player exe next to built DLL so output folder is the runnable bundle -->
-  <Target Name="BundlePlayer" AfterTargets="Build">
+  <!-- BundlePlayer=false (used by the Linux docker builder, which assembles its own
+       bundle from the official Linux player) skips the Windows-only copy step. -->
+  <Target Name="BundlePlayer" AfterTargets="Build" Condition="'$(BundlePlayer)' != 'false'">
     <ItemGroup>
       <PlayerExe Include="../RealServerForBasis/Puck.exe" />
       <PlayerExe Include="../RealServerForBasis/UnityPlayer.dll" />

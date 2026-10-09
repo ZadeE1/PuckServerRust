@@ -12,6 +12,12 @@
 ## Work here
 - `RustEdition/` — Rust conversion workspace, mirrored from `decompiledEdition/` (sources only,
   no `bin/`/`obj/`). All conversion work happens here.
+- `docker/` — Linux dedicated-server builder only (`docker/Dockerfile.builder`,
+  Steam tool `3481440`). Builder fetches the official Linux player and rebuilds
+  `Puck.dll` (IL) + `libaudio_curve.so` into `/out/server`.
+  Copy-to-target flow: `docker/build.sh [dir]` (any Docker host) produces
+  `<dir>/server/` + `<dir>/run.sh`; copy `<dir>` to the target and run `./run.sh`.
+  Never bakes in Windows player files.
 
 ## Work in progress (parked, not abandoned)
 - Sync-pipeline perf (`SynchronizedObject*`, 33 types): profiler freezes live play when these
@@ -24,5 +30,7 @@
 - Profiler (opt-in): run with `PUCK_PROFILE=1`, output `profiler.jsonl` (JSON lines, 1/sec).
 - Native plugins: `cargo build --release` in `RustEdition/native/audio_curve/` BEFORE
   `dotnet build` (the csproj copies the cdylib into the bundle, it does not build it).
+- Linux docker builder passes `-p:BundlePlayer=false` (`RustEdition/Puck.csproj:116`); local
+  Windows builds keep the default bundling behavior.
 - Verify by execution: rebuild must succeed and the bundled server must boot to
   "ready to accept clients" before any commit.
