@@ -7,6 +7,50 @@
 //!
 //! Single-thread assumption: Unity calls `FixedUpdate` on the main thread, so
 //! the cached curves/last-values use plain statics, not locks.
+//!
+//! NOTE: despite the crate name, this library now covers both ported
+//! Puck.FixedUpdate helpers (wind audio + net collider radius). One plugin,
+//! one P/Invoke surface.
+
+// --- NetSphereCollider radius core (Puck.FixedUpdate) ---
+
+const RADIUS_EPS: f32 = 0.00001;
+
+/// Mirrors the radius logic exactly (snap up, Mathf.Lerp down). Returns 1 and
+/// writes out_radius when the value changed enough to matter, else 0 so the
+/// caller skips the managed collider write.
+#[no_mangle]
+pub extern "C" fn physics_puck_radius(
+    grounded: i32,
+    predicted_speed: f32,
+    radius: f32,
+    fixed_dt: f32,
+    out_radius: *mut f32,
+) -> i32 {
+    if out_radius.is_null() {
+        return 0;
+    }
+    let target = if grounded != 0 {
+        0.0
+    } else {
+        (predicted_speed * 0.025).clamp(0.15, 0.75)
+    };
+    let next = if radius < target {
+        target
+    } else if radius > target {
+        radius + (target - radius) * (fixed_dt * 5.0)
+    } else {
+        radius
+    };
+    if (next - radius).abs() > RADIUS_EPS {
+        unsafe {
+            *out_radius = next;
+        }
+        1
+    } else {
+        0
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]

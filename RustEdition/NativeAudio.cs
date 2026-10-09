@@ -13,6 +13,9 @@ public static class NativeAudio
 	[DllImport("audio_curve", CallingConvention = CallingConvention.Cdecl)]
 	private static extern int audio_wind_update(float speed, float maxSpeed, out float vol, out float pitch);
 
+	[DllImport("audio_curve", CallingConvention = CallingConvention.Cdecl)]
+	private static extern int physics_puck_radius(int grounded, float predictedSpeed, float radius, float fixedDt, out float newRadius);
+
 	private static bool useNative;
 
 	public static void Init(AnimationCurve vol, AnimationCurve pitch)
@@ -44,6 +47,25 @@ public static class NativeAudio
 		try
 		{
 			return audio_wind_update(speed, maxSpeed, out vol, out pitch);
+		}
+		catch
+		{
+			useNative = false;
+			return -1;
+		}
+	}
+
+	// 1 = changed, apply output; 0 = gated, skip; -1 = use managed path.
+	public static int EvaluateRadius(bool grounded, float predictedSpeed, float radius, float fixedDt, out float newRadius)
+	{
+		newRadius = radius;
+		if (!useNative)
+		{
+			return -1;
+		}
+		try
+		{
+			return physics_puck_radius(grounded ? 1 : 0, predictedSpeed, radius, fixedDt, out newRadius);
 		}
 		catch
 		{

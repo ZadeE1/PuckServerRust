@@ -116,6 +116,8 @@ public class Puck : NetworkBehaviour
 
 	private bool isNetworkVariablesInitialized;
 
+	private int lastTensorSel = -1;
+
 	[HideInInspector]
 	public float PredictedSpeed => SynchronizedObject.PredictedLinearVelocity.magnitude;
 
@@ -175,23 +177,41 @@ public class Puck : NetworkBehaviour
 		{
 			Rigidbody.centerOfMass = Vector3.zero;
 		}
-		float num = (IsGrounded ? 0f : Mathf.Clamp(PredictedSpeed * 0.025f, 0.15f, 0.75f));
-		if (NetSphereCollider.radius < num)
+		float newRadius;
+		int radiusChanged = NativeAudio.EvaluateRadius(IsGrounded, PredictedSpeed, NetSphereCollider.radius, Time.fixedDeltaTime, out newRadius);
+		if (radiusChanged < 0)
 		{
-			NetSphereCollider.radius = num;
+			float num = (IsGrounded ? 0f : Mathf.Clamp(PredictedSpeed * 0.025f, 0.15f, 0.75f));
+			if (NetSphereCollider.radius < num)
+			{
+				NetSphereCollider.radius = num;
+			}
+			else if (NetSphereCollider.radius > num)
+			{
+				NetSphereCollider.radius = Mathf.Lerp(NetSphereCollider.radius, num, Time.fixedDeltaTime * 5f);
+			}
 		}
-		else if (NetSphereCollider.radius > num)
+		else if (radiusChanged > 0)
 		{
-			NetSphereCollider.radius = Mathf.Lerp(NetSphereCollider.radius, num, Time.fixedDeltaTime * 5f);
+			NetSphereCollider.radius = newRadius;
 		}
-		if (IsTouchingStick)
+		int tensorSel = (IsTouchingStick ? 1 : 0);
+		if (tensorSel != lastTensorSel)
 		{
-			Server_UpdateStickTensor(stickTensor, Quaternion.identity);
+			lastTensorSel = tensorSel;
+			if (IsTouchingStick)
+			{
+				Server_UpdateStickTensor(stickTensor, Quaternion.identity);
+				TouchingStick = null;
+			}
+			else
+			{
+				Server_UpdateStickTensor(defaultTensor, Quaternion.identity);
+			}
+		}
+		else if (IsTouchingStick)
+		{
 			TouchingStick = null;
-		}
-		else
-		{
-			Server_UpdateStickTensor(defaultTensor, Quaternion.identity);
 		}
 		Server_UpdateAudio();
 	}
