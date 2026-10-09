@@ -15,5 +15,7 @@
 
 ## Conventions
 - Profiler (opt-in): run with `PUCK_PROFILE=1`, output `profiler.jsonl` (JSON lines, 1/sec).
+- Native plugins: `cargo build --release` in `RustEdition/native/audio_curve/` BEFORE
+  `dotnet build` (the csproj copies the cdylib into the bundle, it does not build it).
 - Verify by execution: rebuild must succeed and the bundled server must boot to
   "ready to accept clients" before any commit.

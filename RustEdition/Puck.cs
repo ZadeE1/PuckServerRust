@@ -159,6 +159,7 @@ public class Puck : NetworkBehaviour
 		CollisionRecorder collisionRecorder = CollisionRecorder;
 		collisionRecorder.CollisionDeferred = (Action<GameObject, float>)Delegate.Combine(collisionRecorder.CollisionDeferred, new Action<GameObject, float>(OnCollisionDeferred));
 		NetSphereCollider.enabled = false;
+		NativeAudio.Init(windVolumeCurve, windPitchCurve);
 	}
 
 	private void FixedUpdate()
@@ -317,10 +318,21 @@ public class Puck : NetworkBehaviour
 				windAudioSource.Server_SetVolume(0f);
 				return;
 			}
-			float time = Mathf.Min(Speed / MaxSpeed, 1f);
-			windAudioSource.Server_SetVolume(windVolumeCurve.Evaluate(time));
-			float time2 = Mathf.Min(Speed / MaxSpeed, 1f);
-			windAudioSource.Server_SetPitch(windPitchCurve.Evaluate(time2));
+			float volume;
+			float pitch;
+			int changed = NativeAudio.EvaluateWind(Speed, MaxSpeed, out volume, out pitch);
+			if (changed < 0)
+			{
+				float time = Mathf.Min(Speed / MaxSpeed, 1f);
+				windAudioSource.Server_SetVolume(windVolumeCurve.Evaluate(time));
+				float time2 = Mathf.Min(Speed / MaxSpeed, 1f);
+				windAudioSource.Server_SetPitch(windPitchCurve.Evaluate(time2));
+			}
+			else if (changed > 0)
+			{
+				windAudioSource.Server_SetVolume(volume);
+				windAudioSource.Server_SetPitch(pitch);
+			}
 		}
 	}
 

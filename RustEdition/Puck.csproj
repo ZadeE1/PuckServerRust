@@ -130,5 +130,6 @@
     <Copy SourceFiles="@(PlayerPlugins)" DestinationFiles="@(PlayerPlugins->'$(OutDir)Plugins/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(PlayerD3D)" DestinationFiles="@(PlayerD3D->'$(OutDir)D3D12/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(OutDir)Puck_Data/Managed" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="native/audio_curve/target/release/audio_curve.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>
 </Project>

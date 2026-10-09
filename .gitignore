@@ -1,5 +1,6 @@
 [Bb]in/
 [Oo]bj/
 [Ll]ogs/
+RustEdition/native/audio_curve/target/
 *.orig
 *.log
