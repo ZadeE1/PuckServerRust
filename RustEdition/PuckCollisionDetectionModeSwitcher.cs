@@ -9,10 +9,24 @@ public class PuckCollisionDetectionModeSwitcher : MonoBehaviour
 	[HideInInspector]
 	public bool IsContactingStick;
 
+	// ponytail: FixedUpdate runs ~100Hz/puck; skip the Unity extern reads when
+	// the mode is already correct (measured ~0.3ms/s, hygiene only).
+	private CollisionDetectionMode lastMode;
+
 	private void Awake()
 	{
 		Rigidbody = GetComponent<Rigidbody>();
-		Utils.SetRigidbodyCollisionDetectionMode(Rigidbody, CollisionDetectionMode.ContinuousDynamic);
+		ApplyMode(CollisionDetectionMode.ContinuousDynamic);
+	}
+
+	private void ApplyMode(CollisionDetectionMode mode)
+	{
+		if (lastMode == mode)
+		{
+			return;
+		}
+		Utils.SetRigidbodyCollisionDetectionMode(Rigidbody, mode);
+		lastMode = mode;
 	}
 
 	private void FixedUpdate()
@@ -21,11 +35,11 @@ public class PuckCollisionDetectionModeSwitcher : MonoBehaviour
 		{
 			if (IsContactingStick)
 			{
-				Utils.SetRigidbodyCollisionDetectionMode(Rigidbody, CollisionDetectionMode.ContinuousSpeculative);
+				ApplyMode(CollisionDetectionMode.ContinuousSpeculative);
 			}
 			else
 			{
-				Utils.SetRigidbodyCollisionDetectionMode(Rigidbody, CollisionDetectionMode.ContinuousDynamic);
+				ApplyMode(CollisionDetectionMode.ContinuousDynamic);
 			}
 			IsContactingStick = false;
 		}
@@ -36,7 +50,7 @@ public class PuckCollisionDetectionModeSwitcher : MonoBehaviour
 		if (collision.gameObject.TryGetComponent<Stick>(out var _))
 		{
 			IsContactingStick = true;
-			Utils.SetRigidbodyCollisionDetectionMode(Rigidbody, CollisionDetectionMode.ContinuousSpeculative);
+			ApplyMode(CollisionDetectionMode.ContinuousSpeculative);
 		}
 	}
 
@@ -45,7 +59,7 @@ public class PuckCollisionDetectionModeSwitcher : MonoBehaviour
 		if (collision.gameObject.TryGetComponent<Stick>(out var _))
 		{
 			IsContactingStick = true;
-			Utils.SetRigidbodyCollisionDetectionMode(Rigidbody, CollisionDetectionMode.ContinuousSpeculative);
+			ApplyMode(CollisionDetectionMode.ContinuousSpeculative);
 		}
 	}
 

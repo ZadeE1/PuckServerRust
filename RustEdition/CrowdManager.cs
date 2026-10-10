@@ -61,6 +61,15 @@ public class CrowdManager : MonoBehaviourSingleton<CrowdManager>
 			crowdMember.RandomizeAppearance();
 			crowdMember.PlayAnimation(currentAnimation);
 			crowdMember.LookTarget = currentLookTarget;
+			if (ApplicationManager.IsDedicatedGameServer)
+			{
+				// ponytail: crowd sits outside the play area and only celebrates
+				// (animations, kept). Its colliders cost solver pairs for nothing.
+				foreach (Collider collider in crowdMember.GetComponentsInChildren<Collider>(true))
+				{
+					collider.enabled = false;
+				}
+			}
 		}
 	}
 
