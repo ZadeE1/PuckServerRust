@@ -12,7 +12,166 @@
 //! per-tick helpers (wind audio + net collider radius + PID + sync change-mask).
 //! One plugin, one P/Invoke surface.
 
-// --- Synchronized-object change-mask core (SynchronizedObjectData.GetChangeMask) ---
+// --- Synchronized-object LOD selection core (SynchronizedObjectLodSelector) ---
+//
+// Bit-exact mirror. Band config is copied once via sync_lod_configure (called
+// from LodSelector.Configure); per-pair sync_lod_select carries only scalars.
+// Single-thread assumption holds: ticks run on the Unity main thread.
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct LodBandFlat {
+    pub min_distance: f32,
+    pub tick_rate_divisor: u8,
+}
+
+static mut LOD_BANDS: Vec<(f32, u8)> = Vec::new();
+static mut LOD_CULL_MIN: f32 = 0.0;
+static mut LOD_CULL_DIV: u8 = 1;
+static mut LOD_NO_ORIGIN_DIV: u8 = 1;
+static mut LOD_HYST: f32 = 0.0;
+static mut LOD_HIGH_PREC: bool = true;
+
+/// Mirrors LodSelector.Configure. Flat bands: [min_distance, tick_divisor] pairs.
+#[no_mangle]
+pub extern "C" fn sync_lod_configure(
+    bands: *const LodBandFlat,
+    band_count: i32,
+    cull_min: f32,
+    cull_div: u8,
+    no_origin_div: u8,
+    hysteresis: f32,
+    high_precision: i32,
+) {
+    unsafe {
+        *(&raw mut LOD_BANDS) = if bands.is_null() || band_count <= 0 {
+            Vec::new()
+        } else {
+            std::slice::from_raw_parts(bands, band_count as usize)
+                .iter()
+                .map(|b| (b.min_distance, b.tick_rate_divisor))
+                .collect()
+        };
+        *(&raw mut LOD_CULL_MIN) = cull_min;
+        *(&raw mut LOD_CULL_DIV) = cull_div;
+        *(&raw mut LOD_NO_ORIGIN_DIV) = no_origin_div;
+        *(&raw mut LOD_HYST) = hysteresis;
+        *(&raw mut LOD_HIGH_PREC) = high_precision != 0;
+    }
+}
+
+fn lod_hyst_scale(already: bool, hyst: f32) -> f32 {
+    if already {
+        1.0 - hyst
+    } else {
+        1.0 + hyst
+    }
+}
+
+/// Selection result: (band_index, source 0=Default 1=Band 2=Culled 3=NoOrigin,
+/// tick_rate_divisor, use_high_precision_rotation).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LodSelectOut {
+    pub band_index: i32,
+    pub source: i32,
+    pub tick_rate_divisor: u8,
+    pub use_high_precision: u8,
+}
+
+const LOD_DEFAULT: LodSelectOut = LodSelectOut {
+    band_index: -1,
+    source: 0,
+    tick_rate_divisor: 1,
+    use_high_precision: 0,
+};
+
+/// Mirrors LodSelector.Select bit-for-bit. prev_culled: 0/1.
+#[no_mangle]
+pub extern "C" fn sync_lod_select(
+    ox: f32,
+    oy: f32,
+    oz: f32,
+    vdx: f32,
+    vdy: f32,
+    vdz: f32,
+    px: f32,
+    py: f32,
+    pz: f32,
+    prev_band: i32,
+    prev_culled: i32,
+    uses_lod: i32,
+    uses_culling: i32,
+    has_origin: i32,
+) -> LodSelectOut {
+    unsafe {
+        let hyst = *(&raw const LOD_HYST);
+        let mut result = if has_origin == 0 {
+            if uses_lod == 0 {
+                LOD_DEFAULT
+            } else {
+                LodSelectOut {
+                    band_index: -1,
+                    source: 3,
+                    tick_rate_divisor: (*(&raw const LOD_NO_ORIGIN_DIV)).max(1),
+                    use_high_precision: 0,
+                }
+            }
+        } else {
+            let offx = px - ox;
+            let offy = py - oy;
+            let offz = pz - oz;
+            let sqr = offx * offx + offy * offy + offz * offz;
+            let mut r = if uses_lod != 0 {
+                let mut b = LOD_DEFAULT;
+                for (i, (min_d, div)) in (*(&raw const LOD_BANDS)).iter().enumerate() {
+                    let num = min_d * lod_hyst_scale(i as i32 <= prev_band, hyst);
+                    if sqr < num * num {
+                        break;
+                    }
+                    b.band_index = i as i32;
+                    b.source = 1;
+                    b.tick_rate_divisor = (*div).max(1);
+                }
+                b
+            } else {
+                LOD_DEFAULT
+            };
+            if uses_culling != 0 && lod_is_culled(offx, offy, offz, sqr, vdx, vdy, vdz, prev_culled != 0) {
+                r.source = 2;
+                r.tick_rate_divisor = (*(&raw const LOD_CULL_DIV)).max(1);
+            }
+            r
+        };
+        if *(&raw const LOD_HIGH_PREC) && result.source == 0 {
+            result.use_high_precision = 1;
+        }
+        result
+    }
+}
+
+fn lod_is_culled(
+    offx: f32,
+    offy: f32,
+    offz: f32,
+    sqr: f32,
+    vdx: f32,
+    vdy: f32,
+    vdz: f32,
+    was_culled: bool,
+) -> bool {
+    unsafe {
+        if *(&raw const LOD_CULL_DIV) <= 1 {
+            return false;
+        }
+        let hyst = *(&raw const LOD_HYST);
+        let num = *(&raw const LOD_CULL_MIN) * lod_hyst_scale(was_culled, hyst);
+        if sqr > num * num {
+            return offx * vdx + offy * vdy + offz * vdz < 0.0;
+        }
+        false
+    }
+}
 //
 // Bit-exact mirror of the managed float math (IEEE f32 ops in C# order;
 // f64 asin like Mathf.Asin). Feel-critical: verified by cross-language fuzz
@@ -469,6 +628,41 @@ mod tests {
         assert_eq!(s_decomp(-32768, -25.0, 25.0), -25.0);
         assert_eq!(s_decomp(32767, -25.0, 25.0), 25.0);
         assert_eq!(s_decomp(0, -1.0, 1.0), s_decomp(0, -1.0, 1.0));
+    }
+
+    #[test]
+    fn lod_select_defaults_match() {
+        sync_lod_configure(
+            std::ptr::null(),
+            0,
+            50.0,
+            4,
+            2,
+            0.1,
+            1,
+        );
+        // No origin, no LOD => Default (high-precision wrapper still applies).
+        let r = sync_lod_select(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 10.0, 0.0, 0.0, -1, 0, 0, 0, 0);
+        assert_eq!(
+            r,
+            LodSelectOut {
+                band_index: -1,
+                source: 0,
+                tick_rate_divisor: 1,
+                use_high_precision: 1,
+            }
+        );
+        // No origin with LOD => NoOrigin band.
+        let r = sync_lod_select(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 10.0, 0.0, 0.0, -1, 0, 1, 0, 0);
+        assert_eq!(
+            r,
+            LodSelectOut {
+                band_index: -1,
+                source: 3,
+                tick_rate_divisor: 2,
+                use_high_precision: 0,
+            }
+        );
     }
 }
 

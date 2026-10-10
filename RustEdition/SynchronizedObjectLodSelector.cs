@@ -25,6 +25,24 @@ public class SynchronizedObjectLodSelector
 		this.noOriginTickRateDivisor = noOriginTickRateDivisor;
 		this.hysteresis = hysteresis;
 		this.useHighPrecisionRotation = useHighPrecisionRotation;
+		SyncLodBandsToNative();
+	}
+
+	// ponytail: one small array per Configure (values rarely change); keeps the
+	// plugin's copy in sync for TrySelect.
+	private void SyncLodBandsToNative()
+	{
+		NativeMath.LodBandFlat[] flat = null;
+		if (lodBands != null && lodBands.Length != 0)
+		{
+			flat = new NativeMath.LodBandFlat[lodBands.Length];
+			for (int i = 0; i < lodBands.Length; i++)
+			{
+				flat[i].MinDistance = lodBands[i].MinDistance;
+				flat[i].TickRateDivisor = lodBands[i].TickRateDivisor;
+			}
+		}
+		NativeMath.SyncLodConfig(flat, culling.MinDistance, culling.TickRateDivisor, noOriginTickRateDivisor, hysteresis, useHighPrecisionRotation);
 	}
 
 	public void BeginPlayer(Player player)
@@ -46,6 +64,16 @@ public class SynchronizedObjectLodSelector
 
 	public SynchronizedObjectLodSelection Select(Vector3 position, SynchronizedObjectLodSelection previousSelection, bool usesLod, bool usesCulling)
 	{
+		if (NativeMath.TryLodSelect(origin, viewDirection, hasOrigin, position, previousSelection.BandIndex, previousSelection.IsCulled, usesLod, usesCulling, out NativeMath.LodSelectOut native))
+		{
+			return new SynchronizedObjectLodSelection
+			{
+				BandIndex = native.BandIndex,
+				Source = (SynchronizedObjectLodSource)native.Source,
+				TickRateDivisor = native.TickRateDivisor,
+				UseHighPrecisionRotation = native.UseHighPrecisionRotation != 0
+			};
+		}
 		return WithHighPrecisionRotation(GetSelection(position, previousSelection, usesLod, usesCulling));
 	}
 
